@@ -72,13 +72,54 @@ def clear_console():
     else:
         _ = os.system('clear')
 
+def init_data_recording(message):
+    patient_id = message['PID'][0][3][0]
+    filename = f"patient_{patient_id}.json"
+
+    data_record = {
+        "PatientID": patient_id,
+        "PatientName": f"{message['PID'][0][5][0][1]} {message['PID'][0][5][0][0]}",
+        "DateOfBirth": str(datetime.fromtimestamp(int(message['PID'][0][7][0]))),
+        "Sex": "Female" if message['PID'][0][8][0] == "F" else "Male"
+    }
+
+    if not os.path.exists(filename):
+        try:
+            with open(filename, 'a') as f:
+                json.dump({"PatientInfo": data_record, "Records": []}, f, indent=4)
+            print(f"Created new file for patient {patient_id}")
+        except Exception as e:
+            print(f"Failed to create file: {e}")
+            return
+    
+    return filename
+
 def write_to_file(data, filename="hl7_data.json"):
-    try:
-        with open(filename, 'w') as f:
-            json.dump(data, f, indent=4)
-        print(f"Data successfully written to {filename}")
-    except Exception as e:
-        print(f"Failed to write data to file: {e}")
+
+    if not os.path.exists(filename):
+        print(f"File {filename} does not exist. Cannot write data.")
+        return
+    else:
+        try:
+            existing_data = {}
+
+            # Get existing data
+            with open(filename, 'r') as f:
+                existing_data = json.load(f)
+                print(existing_data["Records"])
+                if("Records" not in existing_data):
+                    existing_data["Records"] = []
+                    existing_data["Records"].insert(0,data)
+                else:
+                    existing_data["Records"].insert(0,data)
+
+            # Write updated data
+            with open(filename, 'w') as f:
+                json.dump(existing_data, f, indent=4)
+                print(f"Data successfully written to {filename}")
+
+        except Exception as e:
+            print(f"Failed to write data to file: {e}")
 
 """ ------------------------------------------------------  MAIN  ----------------------------------------------------------- """
 
@@ -102,7 +143,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
         conn, addr = server.accept()
         with conn:
             print(f"Connexion reçue de {addr}")
-            continue_listening = False
+
             while True:
                 buffer = b""
                 data = conn.recv(4096)
@@ -116,30 +157,23 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
                     hl7_message = message.decode(errors='ignore')
                     hl7_message = parse_hl7_message(hl7_message)
 
-                    if not continue_listening:
-                        print("Ecouter en continu ?")
-                        choice = input("Choisissez une option (y/n): ")
+                    print("hl7_message:", hl7_message)
 
-                    if choice.lower() == 'y' or choice.lower() == 'yes':
-                        continue_listening = True
-                        HL7InformationMapping('3', hl7_message) # OBX data
-                        continue 
-                    else:
-                        choice = -1
-                        while choice != 4:
+                    filename = init_data_recording(hl7_message)
 
-                            menu = """Menu:\n\t1. Identité du patient (PID)\n\t2. Observation (OBR)\n\t3. Resultat (OBX)\n\t4. Quitter"""
-                            print(menu)
-                            choice = input("Choisissez une option : ")
+                    record_entry = {
+                        "Timestamp": datetime.now().isoformat(),
+                        "ObservationID": hl7_message['OBX'][0][2][0],
+                        "ObservationValue": hl7_message['OBX'][0][5][0][1],
+                        "Units": hl7_message['OBX'][0][6][0],
+                        "ReferenceRange": str.replace(hl7_message['OBX'][0][7][0], '_', '-'),
+                        "AbnormalFlags": hl7_message['OBX'][0][8][0]
+                    }
 
-                            HL7InformationMapping(choice, hl7_message)
-                        
-                        sys.exit(0)
-                    
-                    
+                    write_to_file(record_entry, filename)
 
                     # Optionnel : envoyer un ACK (acknowledgement HL7)
                     ack = b'\x0bMSH|^~\\&|RECV|HOSP|SEND|LAB|202508041201||ACK^A01|MSG00001|P|2.3\rMSA|AA|MSG00001\x1c\r'
                     conn.sendall(ack)
-                    break
+                    
 
