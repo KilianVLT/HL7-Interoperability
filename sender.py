@@ -1,7 +1,6 @@
 import socket
 from time import sleep  
 import keyboard
-import sys
 
 """ ------------------------------------------------------  MAIN  ----------------------------------------------------------- """
 
@@ -37,10 +36,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect((HOST, PORT))
     i = 0
     while True and not keyboard.is_pressed('q'):
+
         current_message =  list_of_messages[i%len(list_of_messages)]
         s.sendall(START_BLOCK + current_message.encode() + END_BLOCK)
         print("Message", i%len(list_of_messages),"envoyé")
-        
         i+=1
         sleep(1)
         

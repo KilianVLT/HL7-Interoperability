@@ -13,6 +13,7 @@ def parse_hl7_message(hl7_message):
     except Exception as e:
         raise ValueError(f"Failed to parse HL7 message: {e}")
 
+# Deprecated
 def HL7InformationMapping(choice, message):
     mapping = {
         '1': 'PID',
@@ -33,7 +34,8 @@ def HL7InformationMapping(choice, message):
         sys.exit(0)
     else:
         print("Choix invalide. Veuillez réessayer.")
-    
+
+# Deprecated    
 def showPIDInformation(message):
     """ Affiche les informations du segment PID """
     print("\n ------------------------------------------\n")
@@ -46,6 +48,7 @@ def showPIDInformation(message):
     print("Phone number : ", message['PID'][0][13][0])
     print("\n ------------------------------------------\n")
 
+# Deprecated
 def showOBRInformation(message):
     """ Affiche les informations du segment OBR """
     print("\n ------------------------------------------\n")
@@ -55,6 +58,7 @@ def showOBRInformation(message):
     print("Type of observation : ", message['OBR'][0][4][0][3], "\n")
     print("\n ------------------------------------------\n")
 
+# Deprecated
 def showOBXInformation(message):
     """ Affiche les informations du segment OBX """
     print("\n ------------------------------------------\n")
@@ -65,12 +69,6 @@ def showOBXInformation(message):
     print("Reference range : ", str.replace(message['OBX'][0][7][0], '_', '-') , "\n")
     print("Abnormal flags : ", message['OBX'][0][8][0], "\n")
     print("\n ------------------------------------------\n")
-
-def clear_console():
-    if sys.platform.startswith('win'):
-        _ = os.system('cls')
-    else:
-        _ = os.system('clear')
 
 def init_data_recording(message):
     patient_id = message['PID'][0][3][0]
