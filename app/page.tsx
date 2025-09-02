@@ -1,13 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Plus } from "lucide-react";
 
-export function InputWithButton() {
+export function Register() {
   return (
     <div className="flex w-full max-w-sm items-center gap-2">
-      <Input type="text" placeholder="XXX-XX-XXXX" />
-      <Button type="search" variant="outline">
-        <Search />
+      <Button type="search" className="bg-gray-900 text-shadow-white m-auto">
+        Register a new patient
+        <Plus />
       </Button>
     </div>
   )
@@ -36,16 +35,16 @@ export default function Home() {
           <h1 className="text-4xl sm:text-5xl font-extrabold text-center sm:text-left">
             HL7 Interface test
           </h1>
-          <p>
-            Get patient data by entering their patient number below 👇:
+          <p className="m-auto">
+            This is a POC interface for HL7 messages
           </p>
 
           <div className="w-full flex justify-center">
-            <InputWithButton />
+            <Register />
           </div>
         </main>
         <footer className="absolute bottom-4">
-            <p className="text-xs">&copy; 2024 HL7 Interface Test, TIGUM group. All rights reserved.</p>
+            <p className="text-xs">&copy; 2025 HL7 Interface Test, TIGUM group. All rights reserved.</p>
         </footer>
       </div>
     </>
