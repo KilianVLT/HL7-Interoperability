@@ -5,10 +5,12 @@ import keyboard
 import os
 import json
 from datetime import datetime
+import threading
+from globals import stop_event
     
 def parse_hl7_message(hl7_message):
     try:
-        h = hl7.parse(message)
+        h = hl7.parse(hl7_message)
         return h
     except Exception as e:
         raise ValueError(f"Failed to parse HL7 message: {e}")
@@ -81,9 +83,9 @@ def init_data_recording(message):
         "Sex": "Female" if message['PID'][0][8][0] == "F" else "Male"
     }
 
-    if not os.path.exists(filename):
+    if not os.path.exists("./documents/"+filename):
         try:
-            with open(filename, 'a') as f:
+            with open("./documents/"+filename, 'a') as f:
                 json.dump({"PatientInfo": data_record, "Records": []}, f, indent=4)
             print(f"Created new file for patient {patient_id}")
         except Exception as e:
@@ -94,7 +96,7 @@ def init_data_recording(message):
 
 def write_to_file(data, filename="hl7_data.json"):
 
-    if not os.path.exists(filename):
+    if not os.path.exists("../documents/"+filename):
         print(f"File {filename} does not exist. Cannot write data.")
         return
     else:
@@ -102,7 +104,7 @@ def write_to_file(data, filename="hl7_data.json"):
             existing_data = {}
 
             # Get existing data
-            with open(filename, 'r') as f:
+            with open("../documents/"+filename   , 'r') as f:
                 existing_data = json.load(f)
                 print(existing_data["Records"])
                 if("Records" not in existing_data):
@@ -112,7 +114,7 @@ def write_to_file(data, filename="hl7_data.json"):
                     existing_data["Records"].insert(0,data)
 
             # Write updated data
-            with open(filename, 'w') as f:
+            with open("../documents/"+filename, 'w') as f:
                 json.dump(existing_data, f, indent=4)
                 print(f"Data successfully written to {filename}")
 
@@ -121,57 +123,66 @@ def write_to_file(data, filename="hl7_data.json"):
 
 """ ------------------------------------------------------  MAIN  ----------------------------------------------------------- """
 
-# Création du serveur TCP
-# Paramètres de l'écoute
-HOST = '0.0.0.0' 
-PORT = 2575
-
-# Délimiteurs MLLP
-START_BLOCK = b'\x0b'
-END_BLOCK = b'\x1c\r'
 
 
-# Créer la socket serveur
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-    server.bind((HOST, PORT))
-    server.listen(1)
-    print(f"Serveur MLLP en écoute sur {HOST}:{PORT}...")
+def start_recording(filename):
 
-    while True and not keyboard.is_pressed('q'):
-        conn, addr = server.accept()
-        with conn:
-            print(f"Connexion reçue de {addr}")
+    # Création du serveur TCP
+    # Paramètres de l'écoute
+    HOST = '0.0.0.0' 
+    PORT = 2575
 
-            while True:
-                buffer = b""
-                data = conn.recv(4096)
-                if not data:
-                    break
-                buffer += data
-                if END_BLOCK in buffer:
+    # Délimiteurs MLLP
+    START_BLOCK = b'\x0b'
+    END_BLOCK = b'\x1c\r'
 
-                    message = buffer.split(END_BLOCK)[0].lstrip(START_BLOCK)
+    stop_event.clear()
 
-                    hl7_message = message.decode(errors='ignore')
-                    hl7_message = parse_hl7_message(hl7_message)
+    # Créer la socket serveur
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind((HOST, PORT))
+        server.listen(1)
+        server.settimeout(1.0) 
+        print(f"Serveur MLLP en écoute sur {HOST}:{PORT}...")
 
-                    print("hl7_message:", hl7_message)
+        while not stop_event.is_set():
+            try:
+                conn, addr = server.accept()
+            except socket.timeout:
+                continue  # check stop_event again
+            with conn:
+                print(f"Connexion reçue de {addr}")
+                conn.settimeout(1.0)
 
-                    filename = init_data_recording(hl7_message)
+                while not stop_event.is_set():
+                    buffer = b""
+                    data = conn.recv(4096)
+                    if not data:
+                        break
+                    buffer += data
+                    if END_BLOCK in buffer:
 
-                    record_entry = {
-                        "Timestamp": datetime.now().isoformat(),
-                        "ObservationID": hl7_message['OBX'][0][2][0],
-                        "ObservationValue": hl7_message['OBX'][0][5][0][1],
-                        "Units": hl7_message['OBX'][0][6][0],
-                        "ReferenceRange": str.replace(hl7_message['OBX'][0][7][0], '_', '-'),
-                        "AbnormalFlags": hl7_message['OBX'][0][8][0]
-                    }
+                        message = buffer.split(END_BLOCK)[0].lstrip(START_BLOCK)
 
-                    write_to_file(record_entry, filename)
+                        hl7_message = message.decode(errors='ignore')
+                        hl7_message = parse_hl7_message(hl7_message)
 
-                    # Optionnel : envoyer un ACK (acknowledgement HL7)
-                    ack = b'\x0bMSH|^~\\&|RECV|HOSP|SEND|LAB|202508041201||ACK^A01|MSG00001|P|2.3\rMSA|AA|MSG00001\x1c\r'
-                    conn.sendall(ack)
+                        #filename = init_data_recording(hl7_message)
+
+                        record_entry = {
+                            "Timestamp": datetime.now().isoformat(),
+                            "ObservationID": hl7_message['OBX'][0][2][0],
+                            "ObservationValue": hl7_message['OBX'][0][5][0][1],
+                            "Units": hl7_message['OBX'][0][6][0],
+                            "ReferenceRange": str.replace(hl7_message['OBX'][0][7][0], '_', '-'),
+                            "AbnormalFlags": hl7_message['OBX'][0][8][0]
+                        }
+
+                        write_to_file(record_entry, filename)
+
+                        # Optionnel : envoyer un ACK (acknowledgement HL7)
+                        ack = b'\x0bMSH|^~\\&|RECV|HOSP|SEND|LAB|202508041201||ACK^A01|MSG00001|P|2.3\rMSA|AA|MSG00001\x1c\r'
+                        conn.sendall(ack)
                     
-
+    
