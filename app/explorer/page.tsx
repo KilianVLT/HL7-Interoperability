@@ -132,7 +132,7 @@ export default function Home() {
                 <main className="flex flex-col items-center w-full justify-center">
                     <FilesList setNumberOfFiles={setNumberOfFiles} files={filesFiltered} setFiles={setFiles} setFilesFiltered={setFilesFiltered} />
                 </main>
-                <footer className="absolute bottom-4">
+                <footer className="relative bottom-2">
                     <p className="text-xs">&copy; 2025 HL7 Interface Test, TIGUM group. All rights reserved.</p>
                 </footer>
             </div>

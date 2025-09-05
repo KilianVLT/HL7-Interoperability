@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Play, Square } from "lucide-react";
 import Chart from "chart.js";
 
+
 export function Header() {
     return (
         <header className="m-3 absolute top-0 left-0 z-10 flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-slate-700">
@@ -18,24 +19,49 @@ export function Header() {
     )
 }
 
-
 export default function Analytics({ params }: { params: Promise<{ patientId: string }> }) {
     const [patient, setPatient] = useState<any>(null)
+    const [recording, setRecording] = useState<boolean>(false)
     const { patientId } = use(params)
+
+    useEffect(() => {
+
+        const start_recording = async () => {
+            if (recording) {
+                fetch(`http://localhost:5000/recording/${patientId}`)
+                    .then((response) => {
+                        response.json()
+                    })
+                    .then((response) => {
+                        console.log(response)
+                    })
+            }
+            else{
+                fetch("http://localhost:5000/recording/stop")
+                    .then((response)=>response.json())
+                    .then((response)=>console.log(response)
+                    )
+            }
+
+        }
+        start_recording()
+    }, [recording])
 
     useEffect(() => {
         const fetchPatientData = async () => {
             try {
-                const response = await fetch(`http://localhost:5000/analytics/${patientId}`)
-                if (!response.ok) throw new Error("Failed to fetch")
-                const data = await response.json()
-                setPatient(data)
+                if(!recording){
+                    const response = await fetch(`http://localhost:5000/analytics/${patientId}`)
+                    if (!response.ok) throw new Error("Failed to fetch")
+                    const data = await response.json()
+                    setPatient(data)
+                }
             } catch (err) {
                 console.error("❌ Error fetching patient:", err)
             }
         }
         fetchPatientData()
-    }, [patientId])
+    }, [patientId, recording])
 
     useEffect(() => {
         if (!patient) return
@@ -49,15 +75,31 @@ export default function Analytics({ params }: { params: Promise<{ patientId: str
 
         // Get chart data from patient record
         let record: Array<any> = patient.Records && patient.Records.length > 0 ? patient.Records : null
+
+        if (!record) {
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+            // Customize text
+            ctx.font = "16px sans-serif"
+            ctx.fillStyle = "gray"
+            ctx.textAlign = "center"
+            ctx.textBaseline = "middle"
+
+            // Draw message in center
+            ctx.fillText("No records available", canvas.width / 2, canvas.height / 2)
+            return
+        }
+
         record = record.reverse() // Reverse to have chronological order
 
         const chart = new Chart(ctx, {
             type: "line",
             data: {
-                labels: record.map(d => new Date(d.Timestamp).getHours()),
+                labels: record.map(d => new Date(d.Timestamp).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second:"2-digit" })),
                 datasets: [
                     {
-                        label: record[0].Units,
+                        label: ` Glucose ${record[0].Mesure?record[0].Mesure:""} (${record[0].Units})`,
                         data: record.map(d => d.ObservationValue[0]),
                         borderColor: "#111",
                         backgroundColor: "#111",
@@ -124,10 +166,10 @@ export default function Analytics({ params }: { params: Promise<{ patientId: str
                             <p>Sex: {patient.PatientInfo.Sex}</p>
                         </div>
                         <div className="flex flex-row mt-5 ml-5 gap-2">
-                            <Button>
-                                <Play />
+                            <Button onClick={() => setRecording(true)} disabled={recording} variant={recording ? "secondary" : "primary"}>
+                                <Play fill="true" />
                             </Button>
-                            <Button disabled={true} variant="secondary">
+                            <Button onClick={() => setRecording(false)} disabled={!recording} variant={!recording ? "secondary" : "primary"}>
                                 <Square color="black" fill="true" />
                             </Button>
                         </div>

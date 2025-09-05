@@ -1,12 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import Link from "next/link";
 
 export function Register() {
   return (
     <div className="flex w-full max-w-sm items-center gap-2">
-      <Button type="search" className="bg-gray-900 text-shadow-white m-auto">
-        Register a new patient
-        <Plus />
+      <Button type="search" className="bg-gray-900 text-shadow-white m-auto" asChild>
+        <Link href={"/register"}>
+          Register a new patient
+          <Plus />
+        </Link>
       </Button>
     </div>
   )
